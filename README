@@ -1,3 +1,11 @@
 Hello UnifyID!
 
+In order to build, simply open the project in Android Studio and hit run.
+
+I haven't had time to organize so these are just some general thoughts that occurred to me during the process (will update with Further Considerations when I get the chance):
+
 Something I noticed looking through the Android docs was that the two "standard locations you should consider as a developer" when storing media, Environment.getExternalStoragePublicDirectory and Context.getExternalFilesDir, were both low-security. Other applications were free to "read, change, and delete" these files. In order to get around this, I decided some sort of encryption would be necessary.
+
+I ended up choosing to store my media in internal storage, which would only allow the app itself to access the data. In addition, I provided a framework for encrypting/decrypting the data when written to / read from storage. This encryption/decryption method (which I borrowed from a Stack Overflow post) however was not entirely working, so for the time being I have it commented out (this "no-encryption" version works fine, although is arguably less "secure" than perhaps one would like).
+
+

@@ -20,10 +20,19 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.security.Key;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
+
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+
 
 public class MainActivity extends AppCompatActivity {
 
@@ -31,11 +40,13 @@ public class MainActivity extends AppCompatActivity {
     private CameraPreview cameraPreview;
     private int numberOfPhotos = 0;
     private byte[][] allData = new byte[10][];
+    private byte[] testArray = {1, 2, 3, 4};
     private static final int MAGIC_ORIENTATION_NUMBER = 90;
     private static final int TOTAL_PHOTOS = 10;
     private static final int PAUSE_TIME  = 500;
     private static final String TAG = "matag";
     private static final String FILENAME = "super_secure_file_do_not_open";
+    private byte[] key;
 
     // used in getOutputMediaFile
     public static final int MEDIA_TYPE_IMAGE = 1;
@@ -50,7 +61,7 @@ public class MainActivity extends AppCompatActivity {
 
             // append the data
             allData[numberOfPhotos-1] = data;
-
+            //allData[numberOfPhotos-1] = testArray;
             // if we've taken all 10 photos, we're ready to write
             if (numberOfPhotos == TOTAL_PHOTOS) {
                 writeAllDataToFile();
@@ -63,6 +74,19 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        // Generate the key
+        byte[] keyStart = "this is a key".getBytes();
+        try {
+            KeyGenerator kgen = KeyGenerator.getInstance("AES");
+            SecureRandom sr = SecureRandom.getInstance("SHA1PRNG");
+            sr.setSeed(keyStart);
+            kgen.init(128, sr); // 192 and 256 bits may not be available
+            SecretKey skey = kgen.generateKey();
+            key = skey.getEncoded();
+        } catch (NoSuchAlgorithmException e) {
+            Log.d(TAG, "Key gen failed");
+        }
 
         // Do we have a camera?
         if (checkCameraHardware(getApplicationContext())) {
@@ -131,17 +155,25 @@ public class MainActivity extends AppCompatActivity {
 
         File file = new File(getApplicationContext().getFilesDir(), "myFiles");
         //File pictureFile = getOutputMediaFile(MEDIA_TYPE_IMAGE);
+
         try {
             Log.d(TAG, "writing data to file...");
-            FileOutputStream fos = openFileOutput(FILENAME, Context.MODE_PRIVATE);
             int numBytes = 0;
-            for (int i = 0; i < allData.length; i ++) {
+            for (int i = 0; i < allData.length; i++) {
+                FileOutputStream fos = openFileOutput(FILENAME + i, Context.MODE_PRIVATE);
+                try {
+                    allData[i] = encrypt(key,allData[i]);
+                    Log.d(TAG, "encrypt succeeded");
+                } catch (java.lang.Exception e) {
+                    Log.d(TAG, "encrypt failed");
+                }
+
                 fos.write(allData[i]);
                 numBytes += allData[i].length;
+                fos.close();
             }
-            fos.close();
             Log.d(TAG, "finished writing data to file, total bytes written: " + numBytes);
-            readDataFromFile(numBytes);
+            readDataFromFile();
         } catch (FileNotFoundException e) {
             Log.d(TAG, "File not found: " + e.getMessage());
         } catch (IOException e) {
@@ -149,19 +181,61 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void readDataFromFile(int numBytes) {
+    private void readDataFromFile() {
+        byte[][] readBytes = new byte[10][];
         try {
             Log.d(TAG, "reading data from file...");
-            FileInputStream fis = openFileInput(FILENAME);
-            byte[] bytes = new byte[numBytes];
-            fis.read(bytes);
-            Log.d(TAG, "finished reading data from file, total bytes read: " + bytes.length);
-            fis.close();
+            for (int i = 0; i < TOTAL_PHOTOS; i++) {
+                FileInputStream fis = openFileInput(FILENAME + i);
+                readBytes[i] = new byte[allData[i].length];
+                fis.read(readBytes[i]);
+                fis.close();
+                boolean match = true;
+
+                try {
+                    readBytes[i] = decrypt(key, readBytes[i]);
+                    Log.d(TAG, "decrypt succeeded");
+                } catch (java.lang.Exception e) {
+                    Log.d(TAG, "decrypt failed");
+                }
+
+                // for whatever reason, the array.equals method was not
+                // returning true (even when output clearly was), so I use this to check
+                // if I had more time I would look into that more
+                for (int j = 0; j < 1000; j += 17) {
+                    if (allData[i][j] != readBytes[i][j]) {
+                        match = false;
+                        break;
+                    }
+                }
+                Log.d(TAG, "finished reading data from file " + i +
+                        ", size is " + readBytes[i].length + ", match is " + match);
+            }
+
         } catch (FileNotFoundException e) {
             Log.d(TAG, "File not found: " + e.getMessage());
         } catch (IOException e) {
             Log.d(TAG, "Error accessing file: " + e.getMessage());
         }
+    }
+
+    private byte[] encrypt(byte[] data, byte[] clear) throws Exception {
+        return clear;
+        /*SecretKeySpec skeySpec = new SecretKeySpec(data, "AES");
+        Cipher cipher = Cipher.getInstance("AES");
+        cipher.init(Cipher.ENCRYPT_MODE, skeySpec);
+        byte[] encrypted = cipher.doFinal(clear);
+
+        return encrypted;*/
+    }
+
+    private byte[] decrypt(byte[] raw, byte[] encrypted) throws Exception {
+        return encrypted;
+        /*SecretKeySpec skeySpec = new SecretKeySpec(raw, "AES");
+        Cipher cipher = Cipher.getInstance("AES");
+        cipher.init(Cipher.DECRYPT_MODE, skeySpec);
+        byte[] decrypted = cipher.doFinal(encrypted);
+        return decrypted;*/
     }
 
     // Does this device have a camera?
