@@ -1,1 +1,3 @@
 Hello UnifyID!
+
+Something I noticed looking through the Android docs was that the two "standard locations you should consider as a developer" when storing media, Environment.getExternalStoragePublicDirectory and Context.getExternalFilesDir, were both low-security. Other applications were free to "read, change, and delete" these files. In order to get around this, I decided some sort of encryption would be necessary.

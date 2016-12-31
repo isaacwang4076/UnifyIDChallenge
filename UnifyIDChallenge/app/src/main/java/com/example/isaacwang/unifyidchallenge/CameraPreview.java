@@ -5,10 +5,13 @@ package com.example.isaacwang.unifyidchallenge;
  */
 
 import android.content.Context;
+import android.content.res.Configuration;
 import android.hardware.Camera;
 import android.util.Log;
+import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.WindowManager;
 
 import java.io.IOException;
 
@@ -17,6 +20,7 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
     private SurfaceHolder mHolder;
     private Camera mCamera;
     private String TAG = "cptag";
+    public boolean safeToTakePicture = false;
 
     public CameraPreview(Context context, Camera camera) {
         super(context);
@@ -35,6 +39,7 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
         try {
             mCamera.setPreviewDisplay(holder);
             mCamera.startPreview();
+
         } catch (IOException e) {
             Log.d(TAG, "Error setting camera preview: " + e.getMessage());
         }
@@ -56,6 +61,7 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
         // stop preview before making changes
         try {
             mCamera.stopPreview();
+            safeToTakePicture = false;
         } catch (Exception e){
             // ignore: tried to stop a non-existent preview
         }
@@ -67,6 +73,7 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
         try {
             mCamera.setPreviewDisplay(mHolder);
             mCamera.startPreview();
+            safeToTakePicture = true;
 
         } catch (Exception e){
             Log.d(TAG, "Error starting camera preview: " + e.getMessage());
