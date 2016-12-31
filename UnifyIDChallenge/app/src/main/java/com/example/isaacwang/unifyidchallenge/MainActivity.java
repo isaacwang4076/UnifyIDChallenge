@@ -150,8 +150,10 @@ public class MainActivity extends AppCompatActivity {
     // now that we have all our data, lets write it
     private void writeAllDataToFile() {
         File dir = getFilesDir();
-        File f = new File(dir, FILENAME);
-        f.delete();
+        for (int i = 0; i < TOTAL_PHOTOS; i++ ) {
+            File f = new File(dir, FILENAME);
+            f.delete();
+        }
 
         File file = new File(getApplicationContext().getFilesDir(), "myFiles");
         //File pictureFile = getOutputMediaFile(MEDIA_TYPE_IMAGE);
@@ -220,22 +222,22 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private byte[] encrypt(byte[] data, byte[] clear) throws Exception {
-        return clear;
-        /*SecretKeySpec skeySpec = new SecretKeySpec(data, "AES");
+        //return clear;
+        SecretKeySpec skeySpec = new SecretKeySpec(data, "AES");
         Cipher cipher = Cipher.getInstance("AES");
         cipher.init(Cipher.ENCRYPT_MODE, skeySpec);
         byte[] encrypted = cipher.doFinal(clear);
 
-        return encrypted;*/
+        return encrypted;
     }
 
     private byte[] decrypt(byte[] raw, byte[] encrypted) throws Exception {
-        return encrypted;
-        /*SecretKeySpec skeySpec = new SecretKeySpec(raw, "AES");
+        //return encrypted;
+        SecretKeySpec skeySpec = new SecretKeySpec(raw, "AES");
         Cipher cipher = Cipher.getInstance("AES");
         cipher.init(Cipher.DECRYPT_MODE, skeySpec);
         byte[] decrypted = cipher.doFinal(encrypted);
-        return decrypted;*/
+        return decrypted;
     }
 
     // Does this device have a camera?
