@@ -10,6 +10,8 @@ My program successfully takes 10 snapshots spaced half a second apart and stores
 
 The encryption/decryption system I intended to implement is not yet functioning, although I plan to remedy that ASAP, if for nothing but my own stubbornness.
 
+EDIT (post-deadline): Encryption and decryption are now working, and basic functions like Show Images and Delete Images have been added.
+
 FURTHER CONSIDERATIONS
 
 I had a few small issues during development (e.g. making sure CameraPreview was ready before taking picture, working through readDataFromFile to verify my results) that took up a good chunk of time. However these probably aren't worth much consideration.
