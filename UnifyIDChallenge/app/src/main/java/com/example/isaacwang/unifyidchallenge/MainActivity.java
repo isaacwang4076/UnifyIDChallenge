@@ -16,6 +16,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -29,27 +30,29 @@ public class MainActivity extends AppCompatActivity {
     private Camera camera;
     private CameraPreview cameraPreview;
     private int numberOfPhotos = 0;
-    private byte[] allData = new byte[0];
+    private byte[][] allData = new byte[10][];
     private static final int MAGIC_ORIENTATION_NUMBER = 90;
+    private static final int TOTAL_PHOTOS = 10;
+    private static final int PAUSE_TIME  = 500;
     private static final String TAG = "matag";
+    private static final String FILENAME = "super_secure_file_do_not_open";
 
     // used in getOutputMediaFile
     public static final int MEDIA_TYPE_IMAGE = 1;
     public static final int MEDIA_TYPE_VIDEO = 2;
 
+    // callback that stores picture data after picture is taken
     private Camera.PictureCallback pictureCallback = new Camera.PictureCallback() {
 
         @Override
         public void onPictureTaken(byte[] data, Camera camera) {
-            Log.d(TAG, "picture taken...");
+            Log.d(TAG, "picture taken with size " + data.length);
 
             // append the data
-            byte[] combined = new byte[allData.length + data.length];
-            System.arraycopy(allData, 0, combined, 0, allData.length);
-            System.arraycopy(data, 0, combined, allData.length, data.length);
-            allData = combined;
+            allData[numberOfPhotos-1] = data;
 
-            if (numberOfPhotos == 10) {
+            // if we've taken all 10 photos, we're ready to write
+            if (numberOfPhotos == TOTAL_PHOTOS) {
                 writeAllDataToFile();
             }
         }
@@ -100,7 +103,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // sets timertask to capture photos periodically
-    public void capturePhotos() {
+    private void capturePhotos() {
         Log.d(TAG, "capturePhotos called...");
         final Timer timer = new Timer();
 
@@ -108,33 +111,56 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 if (cameraPreview.safeToTakePicture) {
-                    Log.d(TAG, "safe");
                     numberOfPhotos++;
                     camera.takePicture(null, null, pictureCallback);
-                    if (numberOfPhotos == 10) {
+                    if (numberOfPhotos == TOTAL_PHOTOS) {
                         timer.cancel();
                     }
-                } else {
-                    Log.d(TAG, "not yet safe");
                 }
             }
         };
 
-        timer.schedule(takeAndStorePhoto, 0, 500);
+        timer.schedule(takeAndStorePhoto, 0, PAUSE_TIME);
     }
 
+    // now that we have all our data, lets write it
     private void writeAllDataToFile() {
+        File dir = getFilesDir();
+        File f = new File(dir, FILENAME);
+        f.delete();
+
         File file = new File(getApplicationContext().getFilesDir(), "myFiles");
         //File pictureFile = getOutputMediaFile(MEDIA_TYPE_IMAGE);
-
         try {
-            FileOutputStream fos = new FileOutputStream(pictureFile);
-            fos.write(data);
+            Log.d(TAG, "writing data to file...");
+            FileOutputStream fos = openFileOutput(FILENAME, Context.MODE_PRIVATE);
+            int numBytes = 0;
+            for (int i = 0; i < allData.length; i ++) {
+                fos.write(allData[i]);
+                numBytes += allData[i].length;
+            }
             fos.close();
+            Log.d(TAG, "finished writing data to file, total bytes written: " + numBytes);
+            readDataFromFile(numBytes);
         } catch (FileNotFoundException e) {
-            //Log.d(TAG, "File not found: " + e.getMessage());
+            Log.d(TAG, "File not found: " + e.getMessage());
         } catch (IOException e) {
-            //Log.d(TAG, "Error accessing file: " + e.getMessage());
+            Log.d(TAG, "Error accessing file: " + e.getMessage());
+        }
+    }
+
+    private void readDataFromFile(int numBytes) {
+        try {
+            Log.d(TAG, "reading data from file...");
+            FileInputStream fis = openFileInput(FILENAME);
+            byte[] bytes = new byte[numBytes];
+            fis.read(bytes);
+            Log.d(TAG, "finished reading data from file, total bytes read: " + bytes.length);
+            fis.close();
+        } catch (FileNotFoundException e) {
+            Log.d(TAG, "File not found: " + e.getMessage());
+        } catch (IOException e) {
+            Log.d(TAG, "Error accessing file: " + e.getMessage());
         }
     }
 
@@ -164,44 +190,5 @@ public class MainActivity extends AppCompatActivity {
             // Camera is not available (in use or does not exist)
         }
         return c; // returns null if camera is unavailable
-    }
-
-    /** Create a file Uri for saving an image or video */
-    private static Uri getOutputMediaFileUri(int type){
-        return Uri.fromFile(getOutputMediaFile(type));
-    }
-
-    /** Create a File for saving an image or video */
-    private static File getOutputMediaFile(int type){
-        // To be safe, you should check that the SDCard is mounted
-        // using Environment.getExternalStorageState() before doing this.
-
-        File mediaStorageDir = new File(Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_PICTURES), "MyCameraApp");
-        // This location works best if you want the created images to be shared
-        // between applications and persist after your app has been uninstalled.
-
-        // Create the storage directory if it does not exist
-        if (! mediaStorageDir.exists()){
-            if (! mediaStorageDir.mkdirs()){
-                Log.d(TAG, "failed to create directory");
-                return null;
-            }
-        }
-
-        // Create a media file name
-        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        File mediaFile;
-        if (type == MEDIA_TYPE_IMAGE){
-            mediaFile = new File(mediaStorageDir.getPath() + File.separator +
-                    "IMG_"+ timeStamp + ".jpg");
-        } else if(type == MEDIA_TYPE_VIDEO) {
-            mediaFile = new File(mediaStorageDir.getPath() + File.separator +
-                    "VID_"+ timeStamp + ".mp4");
-        } else {
-            return null;
-        }
-
-        return mediaFile;
     }
 }
