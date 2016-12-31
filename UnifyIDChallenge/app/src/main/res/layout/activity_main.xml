@@ -4,6 +4,11 @@
     android:layout_height="match_parent"
     android:id="@+id/mainLayout">
 
+    <ImageView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/imageView" />
+
     <FrameLayout
         android:id="@+id/camera_preview"
         android:layout_width="wrap_content"
@@ -11,15 +16,45 @@
         android:layout_weight="1"
         />
 
-    <Button
-        style="?android:attr/buttonStyleSmall"
-        android:layout_width="100dp"
-        android:layout_height="70dp"
-        android:layout_marginBottom="20dp"
-        android:text="Begin Scan"
-        android:textAllCaps="false"
-        android:id="@+id/button"
-        android:layout_gravity="center"
-        android:onClick="beginScan"/>
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:id="@+id/buttonsLayout"
+        android:gravity="center_horizontal">
+
+        <Button
+            style="?android:attr/buttonStyleSmall"
+            android:layout_width="100dp"
+            android:layout_height="70dp"
+            android:layout_marginBottom="20dp"
+            android:text="Begin Scan"
+            android:textAllCaps="false"
+            android:id="@+id/button"
+            android:layout_gravity="center"
+            android:onClick="beginScan"/>
+
+        <Button
+            style="?android:attr/buttonStyleSmall"
+            android:layout_width="100dp"
+            android:layout_height="70dp"
+            android:layout_marginBottom="20dp"
+            android:text="Show Images"
+            android:textAllCaps="false"
+            android:id="@+id/showImages"
+            android:layout_gravity="center"
+            android:onClick="showImages"/>
+
+        <Button
+            style="?android:attr/buttonStyleSmall"
+            android:layout_width="100dp"
+            android:layout_height="70dp"
+            android:layout_marginBottom="20dp"
+            android:text="Delete Images"
+            android:textAllCaps="false"
+            android:id="@+id/deleteData"
+            android:layout_gravity="center"
+            android:onClick="deleteOldData"/>
+    </LinearLayout>
 
 </LinearLayout>

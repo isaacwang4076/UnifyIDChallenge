@@ -3,9 +3,9 @@ package com.example.isaacwang.unifyidchallenge;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.hardware.Camera;
-import android.net.Uri;
-import android.os.Environment;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -13,25 +13,17 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
+import android.widget.ImageView;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.security.Key;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
-
-import javax.crypto.Cipher;
-import javax.crypto.KeyGenerator;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
+import android.graphics.Matrix;
+import android.widget.ImageView;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -39,8 +31,8 @@ public class MainActivity extends AppCompatActivity {
     private Camera camera;
     private CameraPreview cameraPreview;
     private int numberOfPhotos = 0;
+    private int numberShown = 0;
     private byte[][] allData = new byte[10][];
-    private byte[] testArray = {1, 2, 3, 4};
     private static final int MAGIC_ORIENTATION_NUMBER = 90;
     private static final int TOTAL_PHOTOS = 10;
     private static final int PAUSE_TIME  = 500;
@@ -60,11 +52,20 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "picture taken with size " + data.length);
 
             // append the data
+            /*byte[] combined = new byte[allData.length + data.length];
+            System.arraycopy(allData, 0, combined, 0, allData.length);
+            System.arraycopy(data, 0, combined, allData.length, data.length);
+            allData = combined;*/
+
             allData[numberOfPhotos-1] = data;
-            //allData[numberOfPhotos-1] = testArray;
+
             // if we've taken all 10 photos, we're ready to write
             if (numberOfPhotos == TOTAL_PHOTOS) {
-                writeAllDataToFile();
+
+                // hide the preview and show the buttons
+                ((FrameLayout) findViewById(R.id.camera_preview)).removeAllViews();
+                findViewById(R.id.buttonsLayout).setVisibility(View.VISIBLE);
+                writeDataToFile(allData);
             }
         }
     };
@@ -74,19 +75,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        // Generate the key
-        byte[] keyStart = "this is a key".getBytes();
-        try {
-            KeyGenerator kgen = KeyGenerator.getInstance("AES");
-            SecureRandom sr = SecureRandom.getInstance("SHA1PRNG");
-            sr.setSeed(keyStart);
-            kgen.init(128, sr); // 192 and 256 bits may not be available
-            SecretKey skey = kgen.generateKey();
-            key = skey.getEncoded();
-        } catch (NoSuchAlgorithmException e) {
-            Log.d(TAG, "Key gen failed");
-        }
 
         // Do we have a camera?
         if (checkCameraHardware(getApplicationContext())) {
@@ -104,11 +92,69 @@ public class MainActivity extends AppCompatActivity {
         if (setUpCamera()) {
 
             // get rid of the button
-            ((LinearLayout) findViewById(R.id.mainLayout)).removeView(findViewById(R.id.button));
+            findViewById(R.id.buttonsLayout).setVisibility(View.GONE);
 
             // get to work
             capturePhotos();
         }
+    }
+
+    public void showImages(View v) {
+
+        // array that we will read into
+        final byte[][] storedBytes = readDataFromFile();
+
+        final Timer timer = new Timer();
+        numberShown = 0;
+
+        // task to show an image
+        TimerTask showImage = new TimerTask() {
+            @Override
+            public void run() {
+
+                // we're done showing images
+                if (numberShown == TOTAL_PHOTOS) {
+
+                    // stop the TimerTasks
+                    timer.cancel();
+
+                    // hide the image
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            findViewById(R.id.imageView).setVisibility(View.GONE);
+                        }
+                    });
+
+                    return;
+                }
+
+                // get the bitmap and rotate it
+                byte[] imageBytes = storedBytes[numberShown];
+                if (imageBytes == null) {
+                    return;
+                }
+                Bitmap b = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
+                final Bitmap bRotated = RotateBitmap(b, -MAGIC_ORIENTATION_NUMBER);
+
+                numberShown++;
+
+                // display image
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        ImageView imageView = (ImageView) findViewById(R.id.imageView);
+                        // set the image
+                        imageView.setImageBitmap(bRotated);
+                        // make sure we can see it
+                        imageView.setVisibility(View.VISIBLE);
+                    }
+                });
+
+            }
+        };
+
+        timer.schedule(showImage, 0, PAUSE_TIME);
     }
 
     // returns whether camera is set up successfully
@@ -129,7 +175,9 @@ public class MainActivity extends AppCompatActivity {
     // sets timertask to capture photos periodically
     private void capturePhotos() {
         Log.d(TAG, "capturePhotos called...");
+
         final Timer timer = new Timer();
+        numberOfPhotos = 0;
 
         TimerTask takeAndStorePhoto = new TimerTask() {
             @Override
@@ -147,97 +195,56 @@ public class MainActivity extends AppCompatActivity {
         timer.schedule(takeAndStorePhoto, 0, PAUSE_TIME);
     }
 
-    // now that we have all our data, lets write it
-    private void writeAllDataToFile() {
-        File dir = getFilesDir();
-        for (int i = 0; i < TOTAL_PHOTOS; i++ ) {
-            File f = new File(dir, FILENAME);
-            f.delete();
-        }
+    // deletes old data and writes new data
+    private void writeDataToFile(byte[][] bytes) {
 
-        File file = new File(getApplicationContext().getFilesDir(), "myFiles");
-        //File pictureFile = getOutputMediaFile(MEDIA_TYPE_IMAGE);
+        // delete old data
+        deleteOldData();
 
-        try {
-            Log.d(TAG, "writing data to file...");
-            int numBytes = 0;
-            for (int i = 0; i < allData.length; i++) {
+        // write current data
+        for (int i = 0; i < TOTAL_PHOTOS; i ++) {
+            try {
                 FileOutputStream fos = openFileOutput(FILENAME + i, Context.MODE_PRIVATE);
-                try {
-                    allData[i] = encrypt(key,allData[i]);
-                    Log.d(TAG, "encrypt succeeded");
-                } catch (java.lang.Exception e) {
-                    Log.d(TAG, "encrypt failed");
-                }
-
-                fos.write(allData[i]);
-                numBytes += allData[i].length;
+                fos.write(bytes[i]);
                 fos.close();
+                Log.d(TAG, "finished writing data to file " + i);
+            } catch (FileNotFoundException e) {
+                Log.d(TAG, "File not found: " + e.getMessage());
+            } catch (IOException e) {
+                Log.d(TAG, "Error accessing file: " + e.getMessage());
             }
-            Log.d(TAG, "finished writing data to file, total bytes written: " + numBytes);
-            readDataFromFile();
-        } catch (FileNotFoundException e) {
-            Log.d(TAG, "File not found: " + e.getMessage());
-        } catch (IOException e) {
-            Log.d(TAG, "Error accessing file: " + e.getMessage());
         }
     }
 
-    private void readDataFromFile() {
+    public void deleteOldData(View v) {
+        deleteOldData();
+    }
+
+    private void deleteOldData() {
+        // delete old data
+        File dir = getFilesDir();
+        for (int i = 0; i < TOTAL_PHOTOS; i++) {
+            (new File(dir, FILENAME + i)).delete();
+        }
+    }
+
+    private byte[][] readDataFromFile() {
         byte[][] readBytes = new byte[10][];
-        try {
-            Log.d(TAG, "reading data from file...");
-            for (int i = 0; i < TOTAL_PHOTOS; i++) {
+
+        for (int i = 0; i < TOTAL_PHOTOS; i++) {
+            try {
                 FileInputStream fis = openFileInput(FILENAME + i);
-                readBytes[i] = new byte[allData[i].length];
+                readBytes[i] = new byte[(int) fis.getChannel().size()];
                 fis.read(readBytes[i]);
                 fis.close();
-                boolean match = true;
-
-                try {
-                    readBytes[i] = decrypt(key, readBytes[i]);
-                    Log.d(TAG, "decrypt succeeded");
-                } catch (java.lang.Exception e) {
-                    Log.d(TAG, "decrypt failed");
-                }
-
-                // for whatever reason, the array.equals method was not
-                // returning true (even when output clearly was), so I use this to check
-                // if I had more time I would look into that more
-                for (int j = 0; j < 1000; j += 17) {
-                    if (allData[i][j] != readBytes[i][j]) {
-                        match = false;
-                        break;
-                    }
-                }
-                Log.d(TAG, "finished reading data from file " + i +
-                        ", size is " + readBytes[i].length + ", match is " + match);
+                Log.d(TAG, "finished reading data from file " + i);
+            } catch (FileNotFoundException e) {
+                Log.d(TAG, "File not found: " + e.getMessage());
+            } catch (IOException e) {
+                Log.d(TAG, "Error accessing file: " + e.getMessage());
             }
-
-        } catch (FileNotFoundException e) {
-            Log.d(TAG, "File not found: " + e.getMessage());
-        } catch (IOException e) {
-            Log.d(TAG, "Error accessing file: " + e.getMessage());
         }
-    }
-
-    private byte[] encrypt(byte[] data, byte[] clear) throws Exception {
-        //return clear;
-        SecretKeySpec skeySpec = new SecretKeySpec(data, "AES");
-        Cipher cipher = Cipher.getInstance("AES");
-        cipher.init(Cipher.ENCRYPT_MODE, skeySpec);
-        byte[] encrypted = cipher.doFinal(clear);
-
-        return encrypted;
-    }
-
-    private byte[] decrypt(byte[] raw, byte[] encrypted) throws Exception {
-        //return encrypted;
-        SecretKeySpec skeySpec = new SecretKeySpec(raw, "AES");
-        Cipher cipher = Cipher.getInstance("AES");
-        cipher.init(Cipher.DECRYPT_MODE, skeySpec);
-        byte[] decrypted = cipher.doFinal(encrypted);
-        return decrypted;
+        return readBytes;
     }
 
     // Does this device have a camera?
@@ -266,5 +273,12 @@ public class MainActivity extends AppCompatActivity {
             // Camera is not available (in use or does not exist)
         }
         return c; // returns null if camera is unavailable
+    }
+
+    public static Bitmap RotateBitmap(Bitmap source, float angle)
+    {
+        Matrix matrix = new Matrix();
+        matrix.postRotate(angle);
+        return Bitmap.createBitmap(source, 0, 0, source.getWidth(), source.getHeight(), matrix, true);
     }
 }
